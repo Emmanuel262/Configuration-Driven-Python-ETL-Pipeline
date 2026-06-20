@@ -1,0 +1,21 @@
+order_id,customer_id,product_id,order_date,quantity,discount,payment_type,payment_provider,shipping_carrier,shipping_speed,shipping_cost
+ORD-001,CUST-001,PROD-003,2025-06-02,2,0.00,Credit Card,Visa,DHL,Standard,5.50
+ORD-001,CUST-001,PROD-005,2025-06-02,1,5.00,Credit Card,Visa,DHL,Standard,2.75
+ORD-002,CUST-002,PROD-001,2025-06-03,1,0.00,Mobile Money,M-Pesa,Local Courier,Express,8.25
+ORD-003,CUST-003,PROD-008,2025-06-05,1,2.50,PayPal,PayPal,FedEx,Standard,6.00
+ORD-004,CUST-004,PROD-004,2025-06-07,2,10.00,Credit Card,Mastercard,UPS,Express,12.40
+ORD-005,CUST-005,PROD-002,2025-06-09,3,0.00,Credit Card,Visa,DHL,Standard,7.20
+ORD-006,CUST-006,PROD-010,2025-06-12,1,8.00,Bank Transfer,SEPA,DHL,Express,11.30
+ORD-007,CUST-007,PROD-007,2025-06-14,4,0.00,Mobile Money,Flutterwave,Local Courier,Standard,4.80
+ORD-008,CUST-008,PROD-011,2025-06-18,2,1.50,Credit Card,Visa,FedEx,Standard,6.25
+ORD-009,CUST-009,PROD-006,2025-06-20,1,0.00,Apple Pay,Stripe,UPS,Express,9.10
+ORD-010,CUST-010,PROD-009,2025-06-22,5,3.00,UPI,Razorpay,Local Courier,Standard,5.00
+ORD-011,CUST-011,PROD-012,2025-06-25,1,0.00,Credit Card,Mastercard,DHL,Standard,7.70
+ORD-012,CUST-012,PROD-003,2025-06-28,1,0.00,Credit Card,Visa,FedEx,Express,8.80
+ORD-013,CUST-001,PROD-002,2025-07-01,2,2.00,PayPal,PayPal,UPS,Standard,6.40
+ORD-014,CUST-003,PROD-005,2025-07-03,1,0.00,Credit Card,Visa,FedEx,Express,9.25
+ORD-015,CUST-005,PROD-001,2025-07-05,1,4.00,Credit Card,Mastercard,DHL,Standard,5.90
+ORD-016,CUST-007,PROD-008,2025-07-08,2,0.00,Mobile Money,Flutterwave,Local Courier,Standard,4.50
+ORD-017,CUST-009,PROD-010,2025-07-11,1,6.50,Apple Pay,Stripe,UPS,Express,10.20
+ORD-018,CUST-011,PROD-004,2025-07-13,1,0.00,Credit Card,Visa,DHL,Standard,6.80
+ORD-018,CUST-011,PROD-004,2025-07-13,1,0.00,Credit Card,Visa,DHL,Standard,6.80

@@ -1,0 +1,15 @@
+[
+  {"customer_id":"CUST-001","first_name":"Amina","last_name":"Niyonsaba","email":"amina.n@example.test","country":"Rwanda","signup_date":"2025-01-08"},
+  {"customer_id":"CUST-002","first_name":"Theo","last_name":"Kamau","email":"theo.k@example.test","country":"Kenya","signup_date":"2025-01-19"},
+  {"customer_id":"CUST-003","first_name":"Maya","last_name":"Reed","email":"maya.r@example.test","country":"Canada","signup_date":"2025-02-03"},
+  {"customer_id":"CUST-004","first_name":"Noah","last_name":"Mensah","email":"noah.m@example.test","country":"Ghana","signup_date":"2025-02-17"},
+  {"customer_id":"CUST-005","first_name":"Leila","last_name":"Haddad","email":"leila.h@example.test","country":"Morocco","signup_date":"2025-03-01"},
+  {"customer_id":"CUST-006","first_name":"Jonas","last_name":"Muller","email":"jonas.m@example.test","country":"Germany","signup_date":"2025-03-12"},
+  {"customer_id":"CUST-007","first_name":"Zuri","last_name":"Okafor","email":"zuri.o@example.test","country":"Nigeria","signup_date":"2025-04-06"},
+  {"customer_id":"CUST-008","first_name":"Sofia","last_name":"Silva","email":"sofia.s@example.test","country":"Brazil","signup_date":"2025-04-23"},
+  {"customer_id":"CUST-009","first_name":"Eli","last_name":"Brooks","email":"eli.b@example.test","country":"USA","signup_date":"2025-05-10"},
+  {"customer_id":"CUST-010","first_name":"Priya","last_name":"Shah","email":"priya.s@example.test","country":"India","signup_date":"2025-05-28"},
+  {"customer_id":"CUST-011","first_name":" Hana ","last_name":" Kim ","email":" hana.k@example.test ","country":" South Korea ","signup_date":"2025-06-04"},
+  {"customer_id":"CUST-012","first_name":"Luis","last_name":"Ortega","email":"luis.o@example.test","country":"Mexico","signup_date":"2025-06-19"},
+  {"customer_id":"CUST-012","first_name":"Luis","last_name":"Ortega","email":"luis.o@example.test","country":"Mexico","signup_date":"2025-06-19"}
+]

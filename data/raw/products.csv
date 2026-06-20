@@ -1,0 +1,14 @@
+product_id,product_name,category,price,stock_quantity
+PROD-001,Wireless Keyboard,electronics,49.99,80
+PROD-002,Insulated Bottle,home & kitchen,24.50,150
+PROD-003,Python Field Notes,books,18.75,120
+PROD-004,Canvas Backpack,apparel,64.00,45
+PROD-005,USB-C Hub,electronics,39.95,70
+PROD-006,Desk Lamp,home & kitchen,34.25,62
+PROD-007,Running Socks,apparel,12.50,200
+PROD-008,SQL Pocket Guide,books,21.00,95
+PROD-009,Mechanical Pencil Set,stationery,9.80,180
+PROD-010,Portable SSD,electronics,89.99,35
+PROD-011,Ceramic Mug,home & kitchen,16.40,110
+PROD-012,Travel Organizer,accessories,27.30,75
+PROD-012,Travel Organizer,accessories,27.30,75
