@@ -1,21 +1,26 @@
-"""Target adapters for clean data-lake storage."""
+"""Filesystem loaders for clean, quarantine, and reporting layers."""
 
 from __future__ import annotations
 
-import logging
+import json
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-
 
 class CSVLoader:
-    def __init__(self, output_path: Path) -> None:
-        self.output_path = output_path
+    def __init__(self, path: Path) -> None:
+        self.path = path
 
     def load(self, frame: pd.DataFrame) -> Path:
-        self.output_path.parent.mkdir(parents=True, exist_ok=True)
-        frame.to_csv(self.output_path, index=False, date_format="%Y-%m-%d")
-        logger.info("Loaded %d clean rows to %s", len(frame), self.output_path)
-        return self.output_path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_csv(self.path, index=False, encoding="utf-8", date_format="%Y-%m-%d")
+        return self.path
+
+
+def write_json(path: Path, payload: Any) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, default=str)
+    return path

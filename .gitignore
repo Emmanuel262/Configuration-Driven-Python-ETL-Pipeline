@@ -6,9 +6,11 @@ venv/
 .env
 .ipynb_checkpoints/
 
-# Generated pipeline outputs
+# Generated data-lake layers and operational reports
 data/clean/
+data/quarantine/
+data/reports/
 
-# Large local learning datasets; data/raw contains the Git-friendly demo data.
+# Large source files remain local. Keep small fixtures under tests/fixtures.
 data/*.csv
 data/*.json

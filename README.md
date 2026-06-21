@@ -1,42 +1,78 @@
-# Configuration-Driven Python ETL Pipeline
+# Configuration-Driven Python ETL Pipeline: Version 2
 
-A compact, production-style batch pipeline that extracts e-commerce data from
-CSV and JSON files, applies reusable transformations, enforces data-quality
-rules, and writes validated datasets to a clean data-lake layer.
+A fault-tolerant, multi-source batch pipeline that turns local commerce CSV and
+JSON files into validated dimensions, an order-item fact table, monthly
+analytics, quarantined records, and run-level quality reports.
 
-I built this project while moving from notebook-based exploration toward the
-way data pipelines are organized in production: small modules, explicit
-contracts, automated checks, observable runs, and a command-line entry point.
+This repository is the second iteration of my first data engineering project.
+The main goal was not simply to add more transformations, but to redesign the
+notebook prototype into a project that is easier to run, test, observe, and
+extend.
 
-## Why this project stands out
+## What changed from version 1
 
-- **Configuration driven:** sources, transformations, quality rules, and targets
-  live in one dictionary registry. Existing adapters can be reused without
-  writing a separate script for every dataset.
-- **Extensible components:** extractors and transformations share small
-  interfaces, making new formats and cleaning rules straightforward to add.
-- **Quality before loading:** required fields, nulls, duplicates, and negative
-  business metrics are checked before data reaches the clean layer.
-- **Runs immediately:** the repository contains synthetic, anonymized sample
-  data, so no credentials or external services are required.
-- **Tested:** unit tests cover transformations and quality rules, plus an
-  integration test executes a complete pipeline.
+| Design area | Version 1 | Version 2 |
+|---|---|---|
+| Data model | Three independent sources | Seven normalized commerce sources plus fact and summary outputs |
+| Configuration | Nested transformation dictionaries | Typed, immutable `DatasetSpec` dataclasses |
+| Invalid records | A quality error stops the pipeline | Invalid rows are quarantined; valid rows continue |
+| Failure isolation | One failure stops the batch | Each dataset is isolated and the remaining sources continue |
+| Data quality | Schema, null, uniqueness, and non-negative checks | Adds allowed values, ranges, rejection reasons, and foreign-key checks |
+| Observability | In-memory run result and logs | Metrics CSV, quality CSV/JSON, and a JSON run summary |
+| Analytics | Clean source-shaped tables | Enriched `fact_order_items` and monthly commerce summary |
+| Development flow | Script and unit tests | Modular package, CLI, focused unit/integration tests, and retained notebook lineage |
+
+The central simplification is `DatasetSpec`: one contract declares a dataset's
+file, business key, required fields, data types, normalization rules, and
+quality constraints. This removes long, repeated transformer lists while
+keeping the behavior visible to a beginner reading the project.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     A[Raw CSV / JSON] --> B[Extract]
-    C[Configuration] -.-> B
-    B --> D[Transform]
+    C[DatasetSpec config] -.-> B
+    B --> D[Clean and cast]
     C -.-> D
-    D --> E{Validate}
-    E -->|Pass| F[(Clean CSV layer)]
-    E -->|Fail| G[Stop with quality error]
+    D --> E{Validation gates}
+    E -->|invalid| Q[(Quarantine + reason)]
+    E -->|valid| F[(Clean dimensions)]
+    F --> G[Foreign-key checks]
+    G --> H[Fact and monthly transforms]
+    H --> I[(Clean analytics)]
+    E -.-> R[(Quality and run reports)]
+    G -.-> R
 ```
 
-See [docs/architecture.md](docs/architecture.md) for the component map and
-responsibilities.
+See [docs/architecture.md](docs/architecture.md) for component responsibilities
+and failure behavior.
+
+## Repository structure
+
+```text
+.
+|-- config/
+|   `-- datasets.py            # Typed source and quality contracts
+|-- data/                      # Local raw inputs (large files ignored by Git)
+|   |-- clean/                 # Generated dimensions, facts, and summaries
+|   |-- quarantine/            # Rejected rows with rejection reasons
+|   `-- reports/               # Metrics, quality results, and run summary
+|-- docs/
+|   `-- architecture.md
+|-- pipeline/
+|   |-- enrichments.py
+|   |-- extractors.py
+|   |-- loaders.py
+|   |-- orchestrator.py
+|   |-- transformers.py
+|   `-- validators.py
+|-- tests/
+|-- main.py                    # CLI entry point
+|-- pipeline_v2.ipynb          # Original version-2 prototype and learning record
+|-- PR_DESCRIPTION.txt
+`-- requirements.txt
+```
 
 ## Quick start
 
@@ -44,8 +80,10 @@ Requires Python 3.10 or newer.
 
 ```bash
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
 # macOS/Linux
 source .venv/bin/activate
 
@@ -53,74 +91,42 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-The command runs all configured pipelines and creates:
-
-```text
-data/clean/customers.csv
-data/clean/products.csv
-data/clean/orders.csv
-```
-
-Run just one dataset or override the storage locations:
+Use different storage locations without editing code:
 
 ```bash
-python main.py --pipeline orders
-python main.py --input-dir path/to/raw --output-dir path/to/clean
+python main.py --input-dir path/to/raw --output-dir path/to/data_lake
 ```
 
-## Repository structure
+## Outputs
 
-```text
-.
-|-- data/
-|   |-- raw/                  # Small synthetic inputs tracked by Git
-|   `-- clean/                # Generated outputs ignored by Git
-|-- docs/architecture.md
-|-- notebooks/                # Original exploration notebook
-|-- pipeline/
-|   |-- config.py             # Dataset registry
-|   |-- extractors.py
-|   |-- loaders.py
-|   |-- orchestrator.py
-|   |-- transformers.py
-|   `-- validators.py
-|-- tests/
-|-- main.py
-`-- requirements.txt
-```
+Successful runs create clean source tables plus:
 
-## Add another data source
+- `data/clean/fact_order_items.csv`: analytics-ready line-item grain with revenue, cost, profit, customer, payment, shipping, and location attributes.
+- `data/clean/monthly_commerce_summary.csv`: monthly category performance.
+- `data/quarantine/*_rejected.csv`: bad records retained with an exact rejection reason.
+- `data/reports/pipeline_metrics.csv`: source, clean, rejected, duplicate, status, and timing metrics.
+- `data/reports/data_quality_report.json`: machine-readable result for every quality gate.
+- `data/reports/run_summary.json`: compact batch-level totals.
 
-For a new CSV or JSON source that uses existing cleaning steps, add one entry to
-`PIPELINE_CONFIGS` in `pipeline/config.py`:
+The large source datasets are deliberately ignored by Git. This avoids
+publishing potentially sensitive or oversized data; tests generate small,
+synthetic fixtures at runtime.
 
-```python
-"inventory": {
-    "source": {"type": "csv", "file": "inventory.csv"},
-    "transformations": [
-        {"name": "standardize_columns"},
-        {"name": "cast_types", "options": {"columns": {"quantity": "int"}}},
-        {"name": "drop_duplicates", "options": {"subset": ["sku"]}},
-    ],
-    "validation": {
-        "required_columns": ["sku", "quantity"],
-        "unique_columns": ["sku"],
-        "non_negative_columns": ["quantity"],
-    },
-    "target": {"file": "inventory.csv"},
-}
-```
+## Quality strategy
 
-Place `inventory.csv` in `data/raw/`, then run
-`python main.py --pipeline inventory`. A genuinely new format only requires a
-new extractor adapter and one factory registration.
+The pipeline separates two kinds of failure:
 
-## Data privacy
+1. **Record defects** are recoverable. Null required values after casting,
+   negative measures, out-of-range values, and duplicate keys go to quarantine.
+2. **Dataset defects** are structural. Missing files, missing columns, or a
+   completely empty clean result mark that dataset failed while other datasets
+   continue.
 
-All files in `data/raw/` are fabricated for demonstration. Names, identifiers,
-emails, transactions, and amounts do not represent real people or activity.
-The larger datasets used during development remain local and are excluded by
-`.gitignore`.
+Foreign-key failures are reported as warnings because they reveal upstream
+master-data problems without hiding otherwise useful clean records.
+Unexpected categorical values are warnings for the same reason: they may signal
+business vocabulary drift and need review, but do not automatically prove that
+the record is unusable.
 
 ## Tests
 
@@ -128,9 +134,20 @@ The larger datasets used during development remain local and are excluded by
 python -m unittest discover -s tests -v
 ```
 
-## Possible next steps
+The tests cover column normalization, numeric coercion, quarantine reasons,
+duplicate handling, clean loading, report creation, and fault-tolerant analytics
+skipping.
 
-- Add Parquet and database targets.
-- Persist run metrics for operational monitoring.
-- Add referential-integrity checks between orders, customers, and products.
-- Schedule the command with Airflow or another workflow orchestrator.
+## Add a dataset
+
+Add one `DatasetSpec` to `config/datasets.py`, place the matching file in the
+input directory, and run `python main.py`. A new source format needs a new
+extractor adapter; an existing CSV or JSON source needs configuration only.
+
+## Portfolio learning
+
+Version 1 established separation of ETL responsibilities. Version 2 builds on
+that foundation with contracts, normalized inputs, dependency-aware analytics,
+fault tolerance, quarantine storage, and operational evidence. The notebook is
+kept intentionally as provenance, while `main.py` and the package are the
+production-style execution path.

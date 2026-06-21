@@ -1,0 +1,42 @@
+Title: Refactor version 2 into a fault-tolerant, configuration-driven ETL package
+
+## Why
+
+The version-2 work began as a notebook and introduced a larger normalized
+commerce model. This pull request moves that learning prototype into a modular,
+repeatable project that can handle bad data without losing an entire batch.
+
+## What changed
+
+- Refactored extraction, transformation, validation, loading, enrichment, and
+  orchestration into focused modules.
+- Introduced immutable DatasetSpec dataclasses to replace repeated per-dataset
+  transformer code and keep source contracts in one configuration package.
+- Expanded the pipeline from the version-1 three-source model to seven related
+  commerce datasets.
+- Added row-level fault tolerance: invalid records are written to quarantine
+  with rejection reasons while valid records continue to the clean layer.
+- Isolated dataset failures so one missing or structurally invalid source does
+  not stop all independent ingestion work.
+- Added referential-integrity reporting across customers, orders, payments,
+  products, shipments, and locations.
+- Added an enriched order-item fact table and monthly commerce summary.
+- Added automated run metrics, CSV/JSON data-quality reports, and a JSON run
+  summary.
+- Added unit and integration tests using small synthetic data.
+- Rewrote the README around the design evolution from version 1 and documented
+  the complete data flow with Mermaid architecture diagrams.
+
+## How to test
+
+1. Install dependencies: python -m pip install -r requirements.txt
+2. Run tests: python -m unittest discover -s tests -v
+3. Run the pipeline: python main.py
+4. Review data/clean, data/quarantine, and data/reports.
+
+## Expected impact
+
+The execution path moves from an exploratory notebook to a beginner-readable,
+production-style package. Bad rows become visible and recoverable, operational
+failures become observable, and new CSV/JSON datasets can be onboarded mainly
+through configuration rather than copied pipeline code.

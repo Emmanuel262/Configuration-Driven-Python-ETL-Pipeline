@@ -1,1 +1,1 @@
-"""Automated tests for the ETL project."""
+"""Automated tests for the ETL pipeline."""

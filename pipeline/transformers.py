@@ -1,134 +1,96 @@
-"""Small, reusable transformations assembled from configuration."""
+"""Reusable, contract-driven cleaning and quarantine logic."""
 
 from __future__ import annotations
 
-import logging
 import re
-from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from config.datasets import DatasetSpec
 
 
-class BaseTransformer(ABC):
-    @abstractmethod
-    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """Return a transformed copy of a DataFrame."""
+@dataclass
+class TransformationResult:
+    clean: pd.DataFrame
+    rejected: pd.DataFrame
+    checks: list[dict[str, Any]]
+    duplicates_removed: int
 
 
-class TransformationPipeline(BaseTransformer):
-    def __init__(self, steps: list[BaseTransformer]) -> None:
-        self.steps = steps
+def snake_case(value: Any) -> str:
+    normalized = re.sub(r"[^0-9a-zA-Z]+", "_", str(value).strip())
+    return normalized.strip("_").lower()
 
-    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
+
+class DatasetTransformer:
+    """Apply a ``DatasetSpec`` and split valid from invalid records."""
+
+    def __init__(self, spec: DatasetSpec) -> None:
+        self.spec = spec
+
+    def transform(self, frame: pd.DataFrame) -> TransformationResult:
         result = frame.copy()
-        for step in self.steps:
-            result = step.transform(result)
-        return result
+        result.columns = [snake_case(column) for column in result.columns]
+        missing = sorted(set(self.spec.required) - set(result.columns))
+        if missing:
+            raise ValueError(f"{self.spec.name}: missing required columns {missing}")
 
-
-class StandardizeColumns(BaseTransformer):
-    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
-        result = frame.copy()
-        result.columns = [
-            re.sub(r"[^a-z0-9]+", "_", str(column).strip().lower()).strip("_")
-            for column in result.columns
-        ]
-        return result
-
-
-class CleanStrings(BaseTransformer):
-    def __init__(self, columns: list[str], case: str | None = None) -> None:
-        self.columns = columns
-        self.case = case
-
-    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
-        result = frame.copy()
-        for column in self.columns:
-            if column not in result:
-                continue
-            values = result[column].astype("string").str.strip()
-            if self.case == "lower":
-                values = values.str.lower()
-            elif self.case == "title":
-                values = values.str.title()
-            elif self.case == "upper":
-                values = values.str.upper()
-            result[column] = values
-        return result
-
-
-class ParseDates(BaseTransformer):
-    def __init__(self, columns: list[str], date_format: str | None = None) -> None:
-        self.columns = columns
-        self.date_format = date_format
-
-    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
-        result = frame.copy()
-        for column in self.columns:
+        for column in self.spec.string_columns:
             if column in result:
-                result[column] = pd.to_datetime(
-                    result[column], format=self.date_format, errors="coerce"
-                )
-        return result
+                result[column] = result[column].astype("string").str.strip()
+        for column in self.spec.lowercase_columns:
+            if column in result:
+                result[column] = result[column].str.lower()
+        for column, dtype in self.spec.numeric_columns.items():
+            if column in result:
+                result[column] = pd.to_numeric(result[column], errors="coerce").astype(dtype)
+        for column in self.spec.date_columns:
+            if column in result:
+                result[column] = pd.to_datetime(result[column], errors="coerce")
+
+        reasons = pd.Series("", index=result.index, dtype="string")
+        rejected = pd.Series(False, index=result.index)
+        checks: list[dict[str, Any]] = []
+
+        def quarantine(mask: pd.Series, check: str, reason: str) -> None:
+            nonlocal rejected
+            mask = mask.fillna(False)
+            count = int(mask.sum())
+            reasons.loc[mask] += reason + "; "
+            rejected |= mask
+            checks.append(_check(self.spec.name, check, count, "WARNING"))
+
+        for column in self.spec.required:
+            quarantine(result[column].isna(), f"required_value:{column}", f"{column} is null or invalid")
+        for column in self.spec.non_negative:
+            if column in result:
+                quarantine(result[column].notna() & result[column].lt(0), f"non_negative:{column}", f"{column} is negative")
+        for column, (minimum, maximum) in self.spec.ranges.items():
+            if column in result:
+                invalid = result[column].notna() & ~result[column].between(minimum, maximum)
+                quarantine(invalid, f"range:{column}", f"{column} is outside [{minimum}, {maximum}]")
+        duplicate_mask = pd.Series(False, index=result.index)
+        valid_candidates = result.loc[~rejected]
+        duplicate_mask.loc[valid_candidates.index] = valid_candidates.duplicated(
+            list(self.spec.key), keep="first"
+        )
+        duplicates_removed = int(duplicate_mask.sum())
+        quarantine(duplicate_mask, "unique_key", "duplicate business key")
+
+        rejected_rows = result.loc[rejected].copy()
+        if not rejected_rows.empty:
+            rejected_rows["rejection_reason"] = reasons.loc[rejected].str.rstrip("; ")
+        clean = result.loc[~rejected].reset_index(drop=True)
+        return TransformationResult(clean, rejected_rows.reset_index(drop=True), checks, duplicates_removed)
 
 
-class CastTypes(BaseTransformer):
-    def __init__(self, columns: dict[str, str]) -> None:
-        self.columns = columns
-
-    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
-        result = frame.copy()
-        for column, data_type in self.columns.items():
-            if column not in result:
-                continue
-            if data_type in {"int", "float"}:
-                numeric = pd.to_numeric(result[column], errors="coerce")
-                result[column] = numeric.astype("Int64" if data_type == "int" else "Float64")
-            else:
-                result[column] = result[column].astype(data_type)
-        return result
-
-
-class DropDuplicates(BaseTransformer):
-    def __init__(self, subset: list[str]) -> None:
-        self.subset = subset
-
-    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
-        before = len(frame)
-        result = frame.drop_duplicates(subset=self.subset, keep="first").copy()
-        logger.info("Removed %d duplicate rows", before - len(result))
-        return result
-
-
-class DropMissing(BaseTransformer):
-    def __init__(self, subset: list[str]) -> None:
-        self.subset = subset
-
-    def transform(self, frame: pd.DataFrame) -> pd.DataFrame:
-        before = len(frame)
-        result = frame.dropna(subset=self.subset).copy()
-        logger.info("Removed %d rows missing required values", before - len(result))
-        return result
-
-
-TRANSFORMER_TYPES: dict[str, type[BaseTransformer]] = {
-    "standardize_columns": StandardizeColumns,
-    "clean_strings": CleanStrings,
-    "parse_dates": ParseDates,
-    "cast_types": CastTypes,
-    "drop_duplicates": DropDuplicates,
-    "drop_missing": DropMissing,
-}
-
-
-def build_transformer(configs: list[dict[str, Any]]) -> TransformationPipeline:
-    steps: list[BaseTransformer] = []
-    for config in configs:
-        name = config["name"]
-        if name not in TRANSFORMER_TYPES:
-            raise ValueError(f"Unknown transformation: {name}")
-        steps.append(TRANSFORMER_TYPES[name](**config.get("options", {})))
-    return TransformationPipeline(steps)
+def _check(dataset: str, check: str, failures: int, severity: str) -> dict[str, Any]:
+    return {
+        "dataset": dataset,
+        "check": check,
+        "severity": severity,
+        "failed_rows": failures,
+        "status": "PASS" if failures == 0 else "FAIL",
+    }
