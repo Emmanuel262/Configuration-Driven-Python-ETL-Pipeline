@@ -1,45 +1,45 @@
-"""Data-quality gates applied before records reach clean storage."""
+"""Dataset-level validation gates."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
 
+from config.datasets import DatasetSpec
+
 
 class DataQualityError(ValueError):
-    """Raised when one or more data-quality rules fail."""
+    """Raised when clean output still violates a critical contract."""
 
 
-@dataclass
-class DataValidator:
-    required_columns: list[str]
-    non_null_columns: list[str] = field(default_factory=list)
-    unique_columns: list[str] = field(default_factory=list)
-    non_negative_columns: list[str] = field(default_factory=list)
+class DatasetValidator:
+    def __init__(self, spec: DatasetSpec) -> None:
+        self.spec = spec
 
-    def validate(self, frame: pd.DataFrame) -> None:
-        errors: list[str] = []
-        missing = sorted(set(self.required_columns) - set(frame.columns))
-        if missing:
-            errors.append(f"missing columns: {missing}")
-        if frame.empty:
-            errors.append("dataset is empty")
+    def validate(self, frame: pd.DataFrame) -> list[dict[str, Any]]:
+        checks = [self._record("dataset_not_empty", int(frame.empty))]
+        for column in self.spec.key:
+            checks.append(self._record(f"not_null:{column}", int(frame[column].isna().sum())))
+        checks.append(self._record("unique_key", int(frame.duplicated(list(self.spec.key)).sum())))
+        for column, allowed in self.spec.allowed_values.items():
+            if column in frame:
+                failures = int((~frame[column].dropna().isin(allowed)).sum())
+                checks.append(self._record(f"allowed_values:{column}", failures, "WARNING"))
+        failures = [
+            check for check in checks
+            if check["severity"] == "ERROR" and check["status"] == "FAIL"
+        ]
+        if failures:
+            names = ", ".join(check["check"] for check in failures)
+            raise DataQualityError(f"{self.spec.name}: critical validation failed: {names}")
+        return checks
 
-        for column in self.non_null_columns:
-            if column in frame and frame[column].isna().any():
-                errors.append(f"{column} contains null values")
-        for column in self.unique_columns:
-            if column in frame and frame[column].duplicated().any():
-                errors.append(f"{column} contains duplicate values")
-        for column in self.non_negative_columns:
-            if column in frame and (frame[column].dropna() < 0).any():
-                errors.append(f"{column} contains negative values")
-
-        if errors:
-            raise DataQualityError("; ".join(errors))
-
-
-def build_validator(config: dict[str, Any]) -> DataValidator:
-    return DataValidator(**config)
+    def _record(self, check: str, failures: int, severity: str = "ERROR") -> dict[str, Any]:
+        return {
+            "dataset": self.spec.name,
+            "check": check,
+            "severity": severity,
+            "failed_rows": failures,
+            "status": "PASS" if failures == 0 else "FAIL",
+        }

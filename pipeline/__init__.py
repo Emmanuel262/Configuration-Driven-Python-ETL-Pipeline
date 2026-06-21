@@ -1,5 +1,5 @@
-"""Configuration-driven batch ETL pipeline."""
+"""Configuration-driven ETL pipeline package."""
 
-from pipeline.orchestrator import ETLPipeline, PipelineResult
+from pipeline.orchestrator import PipelineRunner
 
-__all__ = ["ETLPipeline", "PipelineResult"]
+__all__ = ["PipelineRunner"]
