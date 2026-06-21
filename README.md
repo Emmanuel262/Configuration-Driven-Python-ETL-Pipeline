@@ -60,6 +60,8 @@ and failure behavior.
 |   `-- reports/               # Metrics, quality results, and run summary
 |-- docs/
 |   `-- architecture.md
+|-- notebooks/
+|   |-- pipeline_v2.ipynb          # Original version-2 prototype and learning record
 |-- pipeline/
 |   |-- enrichments.py
 |   |-- extractors.py
